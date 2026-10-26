@@ -8,11 +8,14 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [deployStatus, setDeployStatus] = useState({});
 
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (password === 'dyl4n123') setIsLoggedIn(true);
-    else alert('Password salah, King!');
-  };
+const handleLogin = (e) => {
+  e.preventDefault();
+  if (password === import.meta.env.VITE_APP_PASSWORD) {
+    setIsLoggedIn(true);
+  } else {
+    alert('Password salah, King!');
+  }
+};
 
   useEffect(() => {
     if (!isLoggedIn) return;
