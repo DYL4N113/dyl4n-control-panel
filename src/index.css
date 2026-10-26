@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+/* 
+  LIQUID GLASS / APPLE VISION PRO STYLE 
+  - Warna abu-abu transparan (bukan putih)
+  - Blur tinggi (backdrop-filter)
+  - Inner shadow & border tipis buat efek 3D
+*/
+
+.glass-panel {
+  background: rgba(30, 30, 35, 0.4); /* Abu-abu gelap transparan */
+  backdrop-filter: blur(40px) saturate(150%);
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.1), /* Highlight tipis di atas */
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),       /* Bayangan tipis di bawah */
+    0 10px 30px -10px rgba(0, 0, 0, 0.5);    /* Bayangan luar */
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.glass-panel:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 20px 40px -10px rgba(0, 0, 0, 0.6);
+  background: rgba(35, 35, 40, 0.5);
+}
+
+.glass-btn {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.glass-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.glass-btn:active {
+  transform: scale(0.98);
+  background: rgba(255, 255, 255, 0.08);
+}
