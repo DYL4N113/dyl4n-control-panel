@@ -5,51 +5,77 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [password, setPassword] = useState('');
   const [repos, setRepos] = useState([]);
+  const [vercelProjects, setVercelProjects] = useState([]);
   const [loading, setLoading] = useState(false);
   const [deployStatus, setDeployStatus] = useState({});
 
-const handleLogin = (e) => {
-  e.preventDefault();
-  if (password === import.meta.env.VITE_APP_PASSWORD) {
-    setIsLoggedIn(true);
-  } else {
-    alert('Password salah, King!');
-  }
-};
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (password === import.meta.env.VITE_APP_PASSWORD) {
+      setIsLoggedIn(true);
+    } else {
+      alert('Password salah, King!');
+    }
+  };
 
   useEffect(() => {
     if (!isLoggedIn) return;
-    const fetchRepos = async () => {
+    const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await axios.get('https://api.github.com/user/repos?sort=updated&per_page=10', {
+        // 1. Ambil repo dari GitHub
+        const githubRes = await axios.get('https://api.github.com/user/repos?sort=updated&per_page=20', {
           headers: { Authorization: `token ${import.meta.env.VITE_GITHUB_TOKEN}` }
         });
-        setRepos(response.data);
+        
+        // 2. Ambil project dari Vercel (buat tau repo mana yang udah nyambung ke Vercel)
+        const vercelRes = await axios.get('https://api.vercel.com/v9/projects', {
+          headers: { Authorization: `Bearer ${import.meta.env.VITE_VERCEL_TOKEN}` }
+        });
+
+        setRepos(githubRes.data);
+        setVercelProjects(vercelRes.data.projects || []);
       } catch (error) {
-        console.error("Gagal narik repo:", error);
+        console.error("Gagal narik data:", error);
       } finally {
         setLoading(false);
       }
     };
-    fetchRepos();
+    fetchData();
   }, [isLoggedIn]);
 
   const handleDeploy = async (repoName) => {
-    setDeployStatus(prev => ({ ...prev, [repoName]: 'Building...' }));
+    setDeployStatus(prev => ({ ...prev, [repoName]: 'Memicu Build...' }));
+    
     try {
-      const response = await axios.post(import.meta.env.VITE_VERCEL_HOOK);
-      if (response.status === 200 || response.status === 201) {
-        setDeployStatus(prev => ({ ...prev, [repoName]: 'Success!' }));
-      } else {
-        setDeployStatus(prev => ({ ...prev, [repoName]: 'Gagal' }));
+      // Cari project Vercel yang namanya cocok sama nama repo GitHub
+      const matchedProject = vercelProjects.find(p => p.name === repoName);
+
+      if (!matchedProject) {
+        setDeployStatus(prev => ({ ...prev, [repoName]: 'Belum ada di Vercel!' }));
+        return;
       }
+
+      // Tembak Vercel API buat nge-deploy ulang project tersebut
+      await axios.post(`https://api.vercel.com/v13/deployments`, {
+        name: matchedProject.name,
+        project: matchedProject.id,
+        target: 'production'
+      }, {
+        headers: { 
+          Authorization: `Bearer ${import.meta.env.VITE_VERCEL_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      setDeployStatus(prev => ({ ...prev, [repoName]: 'Berhasil di-deploy!' }));
     } catch (error) {
-      setDeployStatus(prev => ({ ...prev, [repoName]: 'Error' }));
+      console.error(error);
+      setDeployStatus(prev => ({ ...prev, [repoName]: 'Error saat Deploy' }));
     }
   };
 
-  // Background statis warna abu-abu gelap kebiruan
+  // Style Liquid Glass
   const bgClass = "min-h-screen bg-[#0f1115] text-white p-8 font-sans overflow-hidden relative";
 
   if (!isLoggedIn) {
@@ -74,7 +100,6 @@ const handleLogin = (e) => {
 
   return (
     <div className={bgClass}>
-      {/* Background Ornamen Halus */}
       <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[100px] pointer-events-none"></div>
       <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[100px] pointer-events-none"></div>
 
@@ -90,37 +115,44 @@ const handleLogin = (e) => {
           <p className="text-center text-white/50 animate-pulse font-sans">Menarik data...</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {repos.map((repo) => (
-              <div key={repo.id} className="glass-panel p-6 flex flex-col justify-between h-full">
-                <div className="mb-4">
-                  <h2 className="text-lg font-semibold mb-1 text-white/90 truncate font-sans">{repo.name}</h2>
-                  <p className="text-white/40 text-xs line-clamp-2 font-sans">{repo.description || "Tidak ada deskripsi."}</p>
-                </div>
-                
-                <div className="mt-auto">
+            {repos.map((repo) => {
+              // Cek apakah repo ini udah ada di Vercel
+              const isOnVercel = vercelProjects.some(p => p.name === repo.name);
+
+              return (
+                <div key={repo.id} className="glass-panel p-6 flex flex-col justify-between h-full">
                   <div className="mb-4">
-                    <span className={`text-[11px] tracking-wide font-bold px-3 py-1.5 rounded-full uppercase font-sans ${
-                      deployStatus[repo.name] === 'Success!' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 
-                      deployStatus[repo.name] === 'Error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 
-                      deployStatus[repo.name] === 'Building...' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' : 'bg-white/5 text-white/40 border border-white/5'
-                    }`}>
-                      {deployStatus[repo.name] || 'Idle'}
-                    </span>
+                    <h2 className="text-lg font-semibold mb-1 text-white/90 truncate font-sans">{repo.name}</h2>
+                    <p className="text-white/40 text-xs line-clamp-2 font-sans">{repo.description || "Tidak ada deskripsi."}</p>
                   </div>
-                  <button 
-                    onClick={() => handleDeploy(repo.name)}
-                    disabled={deployStatus[repo.name] === 'Building...'}
-                    className={`w-full font-semibold py-2.5 rounded-2xl transition-all font-sans ${
-                      deployStatus[repo.name] === 'Building...' 
-                      ? 'bg-white/5 cursor-not-allowed text-white/20' 
-                      : 'glass-btn text-white'
-                    }`}
-                  >
-                    {deployStatus[repo.name] === 'Building...' ? 'Deploying...' : 'Deploy Now'}
-                  </button>
+                  
+                  <div className="mt-auto">
+                    <div className="mb-4">
+                      <span className={`text-[11px] tracking-wide font-bold px-3 py-1.5 rounded-full uppercase font-sans ${
+                        deployStatus[repo.name] === 'Berhasil di-deploy!' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 
+                        deployStatus[repo.name] === 'Error saat Deploy' || deployStatus[repo.name] === 'Belum ada di Vercel!' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 
+                        deployStatus[repo.name]?.includes('Memicu') ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' : 'bg-white/5 text-white/40 border border-white/5'
+                      }`}>
+                        {deployStatus[repo.name] || (isOnVercel ? 'Siap Deploy' : 'Bukan Web')}
+                      </span>
+                    </div>
+                    <button 
+                      onClick={() => handleDeploy(repo.name)}
+                      disabled={!isOnVercel || deployStatus[repo.name]?.includes('Memicu')}
+                      className={`w-full font-semibold py-2.5 rounded-2xl transition-all font-sans ${
+                        !isOnVercel 
+                        ? 'bg-white/5 cursor-not-allowed text-white/20' 
+                        : deployStatus[repo.name]?.includes('Memicu')
+                        ? 'bg-white/5 cursor-not-allowed text-white/20'
+                        : 'glass-btn text-white'
+                      }`}
+                    >
+                      {!isOnVercel ? 'Bukan Web' : deployStatus[repo.name]?.includes('Memicu') ? 'Deploying...' : 'Deploy Now'}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>
